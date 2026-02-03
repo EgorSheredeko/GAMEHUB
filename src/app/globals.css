@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0a0a0a;
+  --color-foreground: #e0e0e0;
+  --color-accent: #8a2be2;
+  --color-card: #1a1a1b;
+  --color-border: #28282b;
+}
+
+:root {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  /* Сетка на фоне */
+  background-image: 
+    linear-gradient(to right, #1a1a1b 1px, transparent 1px),
+    linear-gradient(to bottom, #1a1a1b 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Правильное описание утилит для Tailwind v4 */
+@utility glass-card {
+  background-color: rgba(26, 26, 27, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid #28282b;
+  border-radius: 0.75rem;
+}
+
+@utility neo-button {
+  padding: 0.5rem 1.5rem;
+  background-color: #8a2be2;
+  color: white;
+  font-weight: 700;
+  border-radius: 0.5rem;
+  transition: all 0.3s;
+  box-shadow: 0 0 15px rgba(138, 43, 226, 0.4);
+  cursor: pointer;
+
+  &:hover {
+    background-color: #7000ff;
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
