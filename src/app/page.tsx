@@ -8,17 +8,18 @@ import {
   Flame, 
   Gamepad2, 
   Trophy, 
-  ExternalLink 
+  ExternalLink,
+  Loader2
 } from 'lucide-react';
 import CreatePost from '@/components/CreatePost';
 
 export default function Home() {
   const [posts, setPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Функция для загрузки постов
   const fetchPosts = async () => {
     try {
-      // Сначала .select('*'), потом .order() — это критически важно
       const { data, error } = await supabase
         .from('posts')
         .select('*')
@@ -31,6 +32,8 @@ export default function Home() {
       }
     } catch (err) {
       console.error("Системная ошибка:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -76,9 +79,14 @@ export default function Home() {
         </div>
 
         {/* Список постов */}
-        {posts && posts.length > 0 ? (
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <Loader2 className="text-[#8a2be2] animate-spin" size={32} />
+          </div>
+        ) : posts && posts.length > 0 ? (
           posts.map((post) => (
-            <div key={post.id} className="glass-card overflow-hidden transition-all hover:border-[#8a2be2]/50 group">
+            <div key={post.id} className="glass-card overflow-hidden transition-all hover:border-[#8a2be2]/30 group">
+              {/* Шапка поста */}
               <div className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#8a2be2] to-[#400080] border border-[#28282b]" />
@@ -93,16 +101,35 @@ export default function Home() {
                 </div>
               </div>
               
-              <div className="px-5 pb-6">
-                <p className="text-sm leading-relaxed text-gray-200">{post.content}</p>
+              {/* Текст поста */}
+              <div className="px-5 pb-4">
+                <p className="text-sm leading-relaxed text-gray-200 whitespace-pre-wrap">{post.content}</p>
               </div>
 
+              {/* Изображение поста (если оно есть) */}
+              {post.image_url && (
+                <div className="px-5 pb-6">
+                  <div className="rounded-xl border border-[#28282b] overflow-hidden bg-[#0d0d0e]">
+                    <img 
+                      src={post.image_url} 
+                      alt="Post content" 
+                      className="w-full h-auto max-h-[600px] object-cover hover:scale-[1.01] transition-transform duration-500"
+                      loading="lazy"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Футер поста (кнопки взаимодействия) */}
               <div className="p-3 bg-[#0d0d0e]/50 border-t border-[#28282b] flex gap-6 px-5">
                 <button className="flex items-center gap-2 text-[11px] font-bold text-gray-500 hover:text-red-500 transition-colors uppercase">
                   <Heart size={16} /> 0
                 </button>
                 <button className="flex items-center gap-2 text-[11px] font-bold text-gray-500 hover:text-[#8a2be2] transition-colors uppercase">
                   <MessageSquare size={16} /> Ответить
+                </button>
+                <button className="flex items-center gap-2 text-[11px] font-bold text-gray-500 hover:text-[#00E676] transition-colors uppercase ml-auto">
+                  <Share2 size={16} />
                 </button>
               </div>
             </div>
