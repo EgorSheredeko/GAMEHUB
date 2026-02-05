@@ -7,18 +7,46 @@ import {
   Loader2, User, Trash2, Reply, X, AlertCircle
 } from 'lucide-react';
 
+// ОПРЕДЕЛЯЕМ ТИПЫ ДЛЯ TYPESCRIPT
+interface Profile {
+  username: string | null;
+  avatar_url: string | null;
+}
+
+interface Post {
+  id: number;
+  content: string;
+  image_url: string | null;
+  created_at: string;
+  author_id: string;
+  profiles: Profile | null;
+  likes_count: number;
+}
+
+interface Comment {
+  id: number;
+  content: string;
+  created_at: string;
+  user_id: string;
+  post_id: number;
+  parent_id: number | null;
+  profiles: Profile | null;
+  like_count: number;
+  user_has_liked: boolean;
+}
+
 export default function PostDetailPage() {
   const params = useParams();
   const id = params?.id;
   const router = useRouter();
   
-  const [post, setPost] = useState<any>(null);
-  const [comments, setComments] = useState<any[]>([]);
+  const [post, setPost] = useState<Post | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [commentText, setCommentText] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [replyTo, setReplyTo] = useState<any>(null);
+  const [replyTo, setReplyTo] = useState<Comment | null>(null);
 
   const fetchAllData = useCallback(async (currentUserId?: string) => {
     if (!id) return;
@@ -26,18 +54,24 @@ export default function PostDetailPage() {
 
     try {
       // 1. Загружаем пост
-      const { data: posts } = await supabase.from('posts').select(`*, profiles:author_id(username, avatar_url)`).eq('id', numericId);
-      if (!posts || posts.length === 0) {
+      const { data: posts, error: postError } = await supabase
+        .from('posts')
+        .select(`*, profiles:author_id(username, avatar_url)`)
+        .eq('id', numericId);
+
+      if (postError || !posts || posts.length === 0) {
         setPost(null);
         setLoading(false);
         return;
       }
 
-      // 2. Лайки поста
-      const { count: postLikesCount } = await supabase.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', numericId);
+      // 2. Считаем лайки поста
+      const { count: postLikesCount } = await supabase
+        .from('likes')
+        .select('*', { count: 'exact', head: true })
+        .eq('post_id', numericId);
 
-      // 3. КОММЕНТАРИИ: Загружаем ТОЛЬКО таблицу comments (без джойнов profiles)
-      // Это исключит ошибку {}, если связи в базе настроены криво
+      // 3. Загружаем комментарии
       const { data: commData, error: commError } = await supabase
         .from('comments')
         .select('*') 
@@ -48,16 +82,14 @@ export default function PostDetailPage() {
 
       const rawComments = commData || [];
 
-      // 4. Обогащаем комментарии (Лайки + Профили по отдельности)
+      // 4. Обогащаем комментарии
       const enrichedComments = await Promise.all(rawComments.map(async (c) => {
-        // Загружаем профиль автора комментария
         const { data: prof } = await supabase
           .from('profiles')
           .select('username, avatar_url')
           .eq('id', c.user_id)
           .single();
 
-        // Загружаем лайки этого комментария
         const { count: cLikes } = await supabase
           .from('comment_likes')
           .select('*', { count: 'exact', head: true })
@@ -85,7 +117,7 @@ export default function PostDetailPage() {
       setPost({ ...posts[0], likes_count: postLikesCount || 0 });
       setComments(enrichedComments);
     } catch (err) {
-      console.error("Критическая ошибка загрузки:", err);
+      console.error("Критическая ошибка:", err);
     } finally {
       setLoading(false);
     }
@@ -101,7 +133,7 @@ export default function PostDetailPage() {
   }, [id, fetchAllData]);
 
   const handlePostLike = async () => {
-    if (!user) return alert("Войдите!");
+    if (!user || !post) return alert("Войдите!");
     const { data: existing } = await supabase.from('likes').select('*').eq('user_id', user.id).eq('post_id', post.id).maybeSingle();
     if (existing) await supabase.from('likes').delete().eq('id', existing.id);
     else await supabase.from('likes').insert({ user_id: user.id, post_id: post.id });
@@ -132,18 +164,17 @@ export default function PostDetailPage() {
   };
 
   if (loading) return <div className="min-h-screen bg-[#050505] flex items-center justify-center"><Loader2 className="animate-spin text-[#8a2be2]" size={40} /></div>;
-  if (!post) return <div className="min-h-screen bg-[#050505] flex items-center justify-center text-gray-500 uppercase font-black italic">Пост не найден</div>;
+  if (!post) return <div className="min-h-screen bg-[#050505] flex items-center justify-center text-gray-500 font-black italic">Пост не найден</div>;
 
   return (
     <div className="min-h-screen bg-[#050505] text-white pb-20">
       <div className="max-w-4xl mx-auto p-4 pt-8">
         <button onClick={() => router.push('/')} className="flex items-center gap-2 text-gray-500 hover:text-white mb-8 transition-all">
-          <ChevronLeft size={20} /> <span className="text-[10px] font-black uppercase italic tracking-widest">Назад в ленту</span>
+          <ChevronLeft size={20} /> <span className="text-[10px] font-black uppercase italic">Назад</span>
         </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-8 space-y-8">
-            {/* ПОСТ */}
             <article className="bg-[#0d0d0e] border border-[#28282b] rounded-[2.5rem] p-6 shadow-2xl">
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-12 h-12 rounded-full bg-[#1a1a1c] border border-[#8a2be2]/30 overflow-hidden flex items-center justify-center">
@@ -157,7 +188,7 @@ export default function PostDetailPage() {
               <div className="text-lg text-gray-200 mb-6 whitespace-pre-wrap">{post.content}</div>
               {post.image_url && <img src={post.image_url} className="w-full rounded-[2rem] border border-[#28282b] mb-6" />}
               <div className="flex items-center gap-6 pt-6 border-t border-white/5">
-                <button onClick={handlePostLike} className="flex items-center gap-2 text-[10px] font-black italic uppercase transition-colors hover:text-red-500">
+                <button onClick={handlePostLike} className="flex items-center gap-2 text-[10px] font-black italic uppercase hover:text-red-500">
                   <Heart size={20} className={post.likes_count > 0 ? "fill-red-500 text-red-500" : "text-gray-500"} /> {post.likes_count}
                 </button>
                 <div className="flex items-center gap-2 text-[10px] font-black italic uppercase text-gray-500">
@@ -170,7 +201,7 @@ export default function PostDetailPage() {
             <section className="space-y-4">
               <div className="flex justify-between items-center ml-4">
                 <h2 className="text-[10px] font-black uppercase italic tracking-[0.4em] text-[#8a2be2]">Обсуждение</h2>
-                {replyTo && <button onClick={() => setReplyTo(null)} className="text-[9px] text-red-500 font-black uppercase flex items-center gap-1">Отмена <X size={12}/></button>}
+                {replyTo && <button onClick={() => setReplyTo(null)} className="text-[9px] text-red-500 font-black flex items-center gap-1">Отмена <X size={12}/></button>}
               </div>
               {user ? (
                 <div className="bg-[#0d0d0e] border border-[#28282b] rounded-[2rem] p-4 flex gap-4 items-end">
@@ -184,8 +215,8 @@ export default function PostDetailPage() {
 
             {/* СПИСОК */}
             <div className="space-y-4">
-              {comments.length > 0 ? comments.map((comment) => (
-                <div key={comment.id} className={`bg-[#0a0a0b] border border-[#28282b] p-6 rounded-[2rem] group transition-all hover:border-[#8a2be2]/20 ${comment.parent_id ? 'ml-10 border-l-[#8a2be2]/40' : ''}`}>
+              {comments.map((comment) => (
+                <div key={comment.id} className={`bg-[#0a0a0b] border border-[#28282b] p-6 rounded-[2rem] group ${comment.parent_id ? 'ml-10 border-l-[#8a2be2]/40' : ''}`}>
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-8 h-8 rounded-full bg-[#1a1a1c] border border-white/5 flex items-center justify-center overflow-hidden">
                       {comment.profiles?.avatar_url ? <img src={comment.profiles.avatar_url} /> : <User size={14} className="text-gray-800"/>}
@@ -203,7 +234,7 @@ export default function PostDetailPage() {
                     </button>
                   </div>
                 </div>
-              )) : <div className="py-20 text-center opacity-20 text-[10px] font-black uppercase italic tracking-[.5em]">Тишина в чате...</div>}
+              ))}
             </div>
           </div>
         </div>
